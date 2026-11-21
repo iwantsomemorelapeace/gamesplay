@@ -33,7 +33,7 @@ jobs:
 
           def update_link(match):
               tag = match.group(0)
-              rel = re.search(r'\brel\s*=\s*([\"\'])(.*?)\1', tag, re.I)
+              rel = re.search(r"""\brel\s*=\s*(["\'])(.*?)\1""", tag, re.I)
               if rel and "icon" in rel.group(2).lower().split():
                   return f'<link rel="icon" type="image/png" href="{favicon}">'
               return tag
@@ -61,7 +61,7 @@ jobs:
               links = list(re.finditer(r'<link\b[^>]*>', content, re.I))
               has_icon = any(
                   (lambda m: bool(m and "icon" in m.group(2).lower().split()))(
-                      re.search(r'\brel\s*=\s*([\"\'])(.*?)\1', match.group(0), re.I)
+                      re.search(r"""\brel\s*=\s*(["\'])(.*?)\1""", match.group(0), re.I)
                   )
                   for match in links
               )
