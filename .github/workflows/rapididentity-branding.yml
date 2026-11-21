@@ -1,0 +1,89 @@
+name: Apply RapidIdentity branding to every page
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  brand-pages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Update every HTML page
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          title = "Dashboard | RapidIdentity"
+          favicon = "https://northallegheny.us004-rapididentity.com:443/files/NAlogo_gold_flat.png"
+          changed = []
+
+          def update_link(match):
+              tag = match.group(0)
+              rel = re.search(r'\\brel\\s*=\\s*([\\"\\'])(.*?)\\1', tag, re.I)
+              if rel and "icon" in rel.group(2).lower().split():
+                  return f'<link rel="icon" type="image/png" href="{favicon}">'
+              return tag
+
+          for path in Path(".").rglob("*"):
+              if not path.is_file() or path.suffix.lower() not in {".html", ".htm", ".xhtml"}:
+                  continue
+              if ".git" in path.parts:
+                  continue
+              try:
+                  original = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+
+              content = re.sub(
+                  r'<title\\b[^>]*>.*?</title\\s*>',
+                  f'<title>{title}</title>',
+                  original,
+                  count=1,
+                  flags=re.I | re.S,
+              )
+              if content == original and not re.search(r'<title\\b', content, re.I):
+                  content = re.sub(r'<head\\b[^>]*>', lambda m: m.group(0) + f'\\n<title>{title}</title>', content, count=1, flags=re.I)
+
+              links = list(re.finditer(r'<link\\b[^>]*>', content, re.I))
+              has_icon = any(
+                  (lambda m: bool(m and "icon" in m.group(2).lower().split()))(
+                      re.search(r'\\brel\\s*=\\s*([\\"\\'])(.*?)\\1', match.group(0), re.I)
+                  )
+                  for match in links
+              )
+              content = re.sub(r'<link\\b[^>]*>', update_link, content, flags=re.I)
+              if not has_icon:
+                  content = re.sub(r'<head\\b[^>]*>', lambda m: m.group(0) + f'\\n<link rel="icon" type="image/png" href="{favicon}">', content, count=1, flags=re.I)
+
+              if content != original:
+                  path.write_text(content, encoding="utf-8")
+                  changed.append(str(path))
+
+          print(f"Updated {len(changed)} HTML pages.")
+          PY
+
+      - name: Commit and push branding updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "All pages already have the requested branding."
+          else
+            git commit -m "Apply RapidIdentity title and favicon to every page"
+            git push origin HEAD:main
+          fi
