@@ -48,6 +48,7 @@ jobs:
               except (UnicodeDecodeError, OSError):
                   continue
 
+              original = original.replace("NAGames", "NAStuff")
               content = re.sub(
                   r'<title\b[^>]*>.*?</title\s*>',
                   f'<title>{title}</title>',
